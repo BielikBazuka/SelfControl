@@ -1,19 +1,12 @@
-// ═══════════════════════════════════════════════════
-// KALORIX — Calorie Tracker
-// Two JSONBin bins: one for recipes/ingredients, one for log data
-// ═══════════════════════════════════════════════════
-
 const app = {
 
-    // ── Config ─────────────────────────────────────
-    REC_BIN:    '69a82fc4d0ea881f40ee2767',
-    LOG_BIN:    '69a82fe143b1c97be9b2bc03',
-    API_KEY:    '$2a$10$mSZ34uDjWfYsW2LhVV44i.r8ZC4g0IouOa4/JyeZfZcQkllXhM/Vq',
+    REC_BIN: '69a82fc4d0ea881f40ee2767',
+    LOG_BIN: '69a82fe143b1c97be9b2bc03',
+    API_KEY: '$2a$10$mSZ34uDjWfYsW2LhVV44i.r8ZC4g0IouOa4/JyeZfZcQkllXhM/Vq',
 
     get REC_URL() { return 'https://api.jsonbin.io/v3/b/' + this.REC_BIN; },
     get LOG_URL() { return 'https://api.jsonbin.io/v3/b/' + this.LOG_BIN; },
 
-    // ── State ──────────────────────────────────────
     ingredients: {},
     recipes: [],
     log: {},
@@ -25,7 +18,6 @@ const app = {
     chart: null,
     currentTimeframe: 7,
 
-    // ── Init ───────────────────────────────────────
     async init() {
         this.currentDate = this.today();
         this.ingredients = Object.assign({}, INGREDIENTS_DB);
@@ -61,7 +53,6 @@ const app = {
             String(d.getDate()).padStart(2,'0');
     },
 
-    // ── JSONBin ────────────────────────────────────
     async loadRecipesBin() {
         try {
             var res = await fetch(this.REC_URL + '/latest');
@@ -102,6 +93,23 @@ const app = {
 
     async saveLogBin() {
         try {
+            // Fetch latest first to merge — prevents one device wiping another's data
+            var fetchRes = await fetch(this.LOG_URL + '/latest');
+            if (fetchRes.ok) {
+                var fetchData = await fetchRes.json();
+                var remote = fetchData.record || fetchData;
+                if (remote.log) {
+                    var remoteLog = remote.log;
+                    var days = Object.keys(remoteLog);
+                    for (var i = 0; i < days.length; i++) {
+                        var day = days[i];
+                        if (!this.log[day]) {
+                            this.log[day] = remoteLog[day];
+                        }
+                    }
+                }
+                if (remote.goal && !this.goal) this.goal = remote.goal;
+            }
             var res = await fetch(this.LOG_URL, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'X-Master-Key': this.API_KEY },
@@ -111,7 +119,6 @@ const app = {
         } catch(e) { console.warn('Log bin save failed:', e); }
     },
 
-    // ── Navigation ─────────────────────────────────
     switchPage(page) {
         document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
         document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
@@ -119,7 +126,6 @@ const app = {
         document.querySelector('[data-page="' + page + '"]').classList.add('active');
     },
 
-    // ── Dashboard ──────────────────────────────────
     renderDashboard() {
         var dayData = this.log[this.currentDate] || { meals: [], note: '' };
         var total = this.getDayKcal(this.currentDate);
@@ -133,7 +139,6 @@ const app = {
             var remEl = document.getElementById('remainingKcal');
             remEl.textContent = Math.round(remaining);
             remEl.style.color = remaining < 0 ? 'var(--accent3)' : 'var(--accent2)';
-
             var pct = Math.min((total / this.goal) * 100, 100);
             document.getElementById('progressFill').style.width = pct + '%';
             document.getElementById('progressFill').classList.toggle('over', total > this.goal);
@@ -150,7 +155,6 @@ const app = {
         var label = this.currentDate === today ? 'Today' :
             new Date(this.currentDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
         document.getElementById('logDateLabel').textContent = label;
-
         document.getElementById('dayNote').value = dayData.note || '';
 
         var html = '';
@@ -198,7 +202,6 @@ const app = {
         this.saveLogBin();
     },
 
-    // ── Log Modal ──────────────────────────────────
     openLogModal() {
         this.setLogType('ingredient', document.querySelector('[data-type="ingredient"]'));
         document.getElementById('logAmount').value = '';
@@ -218,13 +221,12 @@ const app = {
 
         var isQuick = type === 'quick';
         document.getElementById('logSelectRow').style.display = isQuick ? 'none' : '';
-        document.getElementById('logNameRow').style.display  = isQuick ? '' : 'none';
+        document.getElementById('logNameRow').style.display = isQuick ? '' : 'none';
 
         if (isQuick) {
             document.getElementById('logAmountLabel').textContent = 'Calories (kcal)';
             document.getElementById('logAmount').placeholder = 'e.g. 450';
             document.getElementById('logCalcPreview').textContent = '';
-            // Remove live preview listeners
             document.getElementById('logItemSelect').onchange = null;
             document.getElementById('logAmount').oninput = null;
         } else {
@@ -270,7 +272,6 @@ const app = {
             }
             document.getElementById('logCalcPreview').textContent = amt > 0 ? '≈ ' + Math.round(kcal) + ' kcal' : '';
         }
-
         sel.onchange = update;
         document.getElementById('logAmount').oninput = update;
     },
@@ -291,17 +292,12 @@ const app = {
     saveLogEntry() {
         var amt = parseFloat(document.getElementById('logAmount').value);
 
-        // Quick kcal mode
         if (this.currentLogType === 'quick') {
             if (!amt || amt <= 0) { alert('Please enter a calorie amount.'); return; }
             var qname = document.getElementById('logQuickName').value.trim() || 'Meal';
             if (!this.log[this.currentDate]) this.log[this.currentDate] = { meals: [], note: '' };
             this.log[this.currentDate].meals.push({
-                name: qname,
-                amount: amt,
-                unit: 'kcal',
-                kcal: amt,
-                type: 'quick',
+                name: qname, amount: amt, unit: 'kcal', kcal: amt, type: 'quick',
                 time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
             });
             this.closeLogModal();
@@ -314,9 +310,7 @@ const app = {
         var sel = document.getElementById('logItemSelect');
         if (!sel.value || !amt || amt <= 0) { alert('Please select an item and enter an amount.'); return; }
 
-        var kcal = 0;
-        var name = '';
-        var unit = 'g';
+        var kcal = 0, name = '', unit = 'g';
 
         if (this.currentLogType === 'ingredient') {
             var ing = this.ingredients[sel.value];
@@ -333,10 +327,7 @@ const app = {
 
         if (!this.log[this.currentDate]) this.log[this.currentDate] = { meals: [], note: '' };
         this.log[this.currentDate].meals.push({
-            name: name,
-            amount: amt,
-            unit: unit,
-            kcal: kcal,
+            name: name, amount: amt, unit: unit, kcal: kcal,
             type: this.currentLogType === 'recipe' ? 'recipe' : 'product',
             time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
         });
@@ -347,7 +338,6 @@ const app = {
         this.saveLogBin();
     },
 
-    // ── Goal ───────────────────────────────────────
     openGoalModal() {
         document.getElementById('goalInput').value = this.goal || '';
         document.getElementById('goalModal').classList.add('open');
@@ -367,7 +357,6 @@ const app = {
         this.saveLogBin();
     },
 
-    // ── Chart ──────────────────────────────────────
     setTimeframe(days, btn) {
         this.currentTimeframe = days;
         document.querySelectorAll('.pill').forEach(function(p) { p.classList.remove('active'); });
@@ -378,65 +367,44 @@ const app = {
     buildChart() {
         var ctx = document.getElementById('calorieChart').getContext('2d');
         var data = this.getChartData(this.currentTimeframe);
-
         this.chart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: data.labels,
-                datasets: [
-                    {
-                        label: 'Calories',
-                        data: data.values,
-                        backgroundColor: function(ctx) {
-                            var val = ctx.raw;
-                            var goal = app.goal;
-                            if (!goal) return 'rgba(232,255,90,0.7)';
-                            return val > goal ? 'rgba(255,107,107,0.7)' : 'rgba(232,255,90,0.7)';
-                        },
-                        borderColor: function(ctx) {
-                            var val = ctx.raw;
-                            var goal = app.goal;
-                            if (!goal) return '#e8ff5a';
-                            return val > goal ? '#ff6b6b' : '#e8ff5a';
-                        },
-                        borderWidth: 1,
-                        borderRadius: 6,
-                        borderSkipped: false,
-                    }
-                ]
+                datasets: [{
+                    label: 'Calories',
+                    data: data.values,
+                    backgroundColor: function(ctx) {
+                        var val = ctx.raw, goal = app.goal;
+                        if (!goal) return 'rgba(232,255,90,0.7)';
+                        return val > goal ? 'rgba(255,107,107,0.7)' : 'rgba(232,255,90,0.7)';
+                    },
+                    borderColor: function(ctx) {
+                        var val = ctx.raw, goal = app.goal;
+                        if (!goal) return '#e8ff5a';
+                        return val > goal ? '#ff6b6b' : '#e8ff5a';
+                    },
+                    borderWidth: 1, borderRadius: 6, borderSkipped: false
+                }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                responsive: true, maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: '#1a1e28',
-                        borderColor: '#2e3448',
-                        borderWidth: 1,
-                        titleColor: '#f0f2f8',
-                        bodyColor: '#e8ff5a',
+                        backgroundColor: '#1a1e28', borderColor: '#2e3448', borderWidth: 1,
+                        titleColor: '#f0f2f8', bodyColor: '#e8ff5a',
                         titleFont: { family: 'Syne', weight: '700' },
                         bodyFont: { family: 'DM Mono' },
-                        callbacks: {
-                            label: function(ctx) { return ctx.raw + ' kcal'; }
-                        }
+                        callbacks: { label: function(ctx) { return ctx.raw + ' kcal'; } }
                     }
                 },
                 scales: {
-                    x: {
-                        grid: { color: '#1a1e28', drawBorder: false },
-                        ticks: { color: '#4a5270', font: { family: 'DM Mono', size: 11 } }
-                    },
-                    y: {
-                        grid: { color: '#252a38', drawBorder: false },
-                        ticks: { color: '#4a5270', font: { family: 'DM Mono', size: 11 } },
-                        beginAtZero: true
-                    }
+                    x: { grid: { color: '#1a1e28', drawBorder: false }, ticks: { color: '#4a5270', font: { family: 'DM Mono', size: 11 } } },
+                    y: { grid: { color: '#252a38', drawBorder: false }, ticks: { color: '#4a5270', font: { family: 'DM Mono', size: 11 } }, beginAtZero: true }
                 }
             }
         });
-
         if (this.goal > 0) this.addGoalLine();
     },
 
@@ -445,15 +413,9 @@ const app = {
         var existing = this.chart.data.datasets.find(function(d) { return d.label === 'Goal'; });
         if (!existing) {
             this.chart.data.datasets.push({
-                label: 'Goal',
-                data: new Array(this.currentTimeframe).fill(this.goal),
-                type: 'line',
-                borderColor: '#5affd6',
-                borderWidth: 1.5,
-                borderDash: [6, 4],
-                pointRadius: 0,
-                fill: false,
-                tension: 0
+                label: 'Goal', data: new Array(this.currentTimeframe).fill(this.goal),
+                type: 'line', borderColor: '#5affd6', borderWidth: 1.5,
+                borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0
             });
         } else {
             existing.data = new Array(this.currentTimeframe).fill(this.goal);
@@ -477,33 +439,21 @@ const app = {
     },
 
     getChartData(days) {
-        var labels = [];
-        var values = [];
+        var labels = [], values = [];
         for (var i = days - 1; i >= 0; i--) {
             var d = new Date();
             d.setDate(d.getDate() - i);
-            var key = d.getFullYear() + '-' +
-                String(d.getMonth()+1).padStart(2,'0') + '-' +
-                String(d.getDate()).padStart(2,'0');
-
+            var key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
             var label = '';
-            if (days <= 7) {
-                label = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
-            } else if (days <= 30) {
-                label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-            } else {
-                label = i % 7 === 0
-                    ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-                    : '';
-            }
-
+            if (days <= 7) label = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
+            else if (days <= 30) label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            else label = i % 7 === 0 ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
             labels.push(label);
             values.push(Math.round(this.getDayKcal(key)));
         }
         return { labels: labels, values: values };
     },
 
-    // ── Recipes Page ───────────────────────────────
     renderRecipesPage() {
         this.renderIngredients();
         this.renderRecipes();
@@ -512,56 +462,43 @@ const app = {
 
     renderIngredients(filter) {
         var entries = Object.entries(this.ingredients).sort(function(a,b) { return a[0].localeCompare(b[0]); });
-        if (filter) {
-            entries = entries.filter(function(e) { return e[0].toLowerCase().includes(filter.toLowerCase()); });
-        }
+        if (filter) entries = entries.filter(function(e) { return e[0].toLowerCase().includes(filter.toLowerCase()); });
         document.getElementById('ingCount').textContent = Object.keys(this.ingredients).length;
         var html = '';
         for (var i = 0; i < entries.length; i++) {
             var isCustom = !INGREDIENTS_DB[entries[i][0]];
-            html += '<div class="data-item">' +
-                '<div><div class="data-item-name">' + entries[i][0] + '</div>' +
+            html += '<div class="data-item"><div><div class="data-item-name">' + entries[i][0] + '</div>' +
                 '<div class="data-item-meta">' + entries[i][1].unit + '</div></div>' +
-                '<div class="data-item-right">' +
-                '<span class="data-kcal">' + entries[i][1].kcal + ' kcal</span>' +
+                '<div class="data-item-right"><span class="data-kcal">' + entries[i][1].kcal + ' kcal</span>' +
                 (isCustom ? '<button class="data-delete" onclick="app.deleteIngredient(\'' + entries[i][0] + '\')">✕</button>' : '') +
                 '</div></div>';
         }
         document.getElementById('ingredientsList').innerHTML = html || '<div style="color:var(--text3);padding:16px;text-align:center;">No results</div>';
     },
 
-    filterIngredients() {
-        this.renderIngredients(document.getElementById('ingSearch').value);
-    },
+    filterIngredients() { this.renderIngredients(document.getElementById('ingSearch').value); },
 
     renderRecipes(filter) {
         document.getElementById('recCount').textContent = this.recipes.length;
         var list = this.recipes;
         if (filter) list = list.filter(function(r) { return r.name.toLowerCase().includes(filter.toLowerCase()); });
-        var self = this;
-        var html = '';
+        var self = this, html = '';
         for (var i = 0; i < list.length; i++) {
             var r = list[i];
             var kcalTotal = r.ingredients ? r.ingredients.reduce(function(s, ing) {
                 var base = self.ingredients[ing.name ? ing.name.toLowerCase() : ''];
                 return s + (base ? base.kcal * ing.amount / 100 : 0);
             }, 0) : 0;
-            html += '<div class="data-item">' +
-                '<div><div class="data-item-name">' + r.name + '</div>' +
+            html += '<div class="data-item"><div><div class="data-item-name">' + r.name + '</div>' +
                 '<div class="data-item-meta">' + (r.ingredients ? r.ingredients.length : 0) + ' ingredients</div></div>' +
-                '<div class="data-item-right">' +
-                '<span class="data-kcal">' + Math.round(kcalTotal) + ' kcal</span>' +
-                '<button class="data-delete" onclick="app.deleteRecipe(' + r.id + ')">✕</button>' +
-                '</div></div>';
+                '<div class="data-item-right"><span class="data-kcal">' + Math.round(kcalTotal) + ' kcal</span>' +
+                '<button class="data-delete" onclick="app.deleteRecipe(' + r.id + ')">✕</button></div></div>';
         }
         document.getElementById('recipesList').innerHTML = html || '<div style="color:var(--text3);padding:16px;text-align:center;">No recipes yet</div>';
     },
 
-    filterRecipes() {
-        this.renderRecipes(document.getElementById('recSearch').value);
-    },
+    filterRecipes() { this.renderRecipes(document.getElementById('recSearch').value); },
 
-    // ── Ingredient Modal ───────────────────────────
     openIngredientModal() {
         document.getElementById('newIngName').value = '';
         document.getElementById('newIngKcal').value = '';
@@ -569,9 +506,7 @@ const app = {
         document.getElementById('ingredientModal').classList.add('open');
     },
 
-    closeIngredientModal() {
-        document.getElementById('ingredientModal').classList.remove('open');
-    },
+    closeIngredientModal() { document.getElementById('ingredientModal').classList.remove('open'); },
 
     saveIngredient() {
         var name = document.getElementById('newIngName').value.trim().toLowerCase();
@@ -593,7 +528,6 @@ const app = {
         this.saveRecipesBin();
     },
 
-    // ── Recipe Modal ───────────────────────────────
     openRecipeModal() {
         this.editingRecipeId = null;
         this.currentRecipe = { name: '', ingredients: [], steps: [''] };
@@ -606,9 +540,7 @@ const app = {
         document.getElementById('recipeModal').classList.add('open');
     },
 
-    closeRecipeModal() {
-        document.getElementById('recipeModal').classList.remove('open');
-    },
+    closeRecipeModal() { document.getElementById('recipeModal').classList.remove('open'); },
 
     populateRecipeIngSelect() {
         var sel = document.getElementById('recIngSelect');
@@ -633,16 +565,13 @@ const app = {
     },
 
     renderRecipeIngList() {
-        var self = this;
         var html = '';
         for (var i = 0; i < this.currentRecipe.ingredients.length; i++) {
             var ing = this.currentRecipe.ingredients[i];
             var base = this.ingredients[ing.name.toLowerCase()];
             var kcal = base ? Math.round(base.kcal * ing.amount / 100) : 0;
-            html += '<div class="rec-ing-item">' +
-                '<span>' + ing.name + ' — ' + ing.amount + 'g (' + kcal + ' kcal)</span>' +
-                '<button onclick="app.removeRecipeIng(' + i + ')">✕</button>' +
-                '</div>';
+            html += '<div class="rec-ing-item"><span>' + ing.name + ' — ' + ing.amount + 'g (' + kcal + ' kcal)</span>' +
+                '<button onclick="app.removeRecipeIng(' + i + ')">✕</button></div>';
         }
         document.getElementById('recIngList').innerHTML = html;
     },
@@ -662,51 +591,37 @@ const app = {
         document.getElementById('recTotal').textContent = total > 0 ? 'Total: ' + Math.round(total) + ' kcal' : '';
     },
 
-    addRecipeStep() {
-        this.currentRecipe.steps.push('');
-        this.renderRecipeSteps();
-    },
+    addRecipeStep() { this.currentRecipe.steps.push(''); this.renderRecipeSteps(); },
 
     renderRecipeSteps() {
         var html = '';
         for (var i = 0; i < this.currentRecipe.steps.length; i++) {
-            html += '<div class="step-row">' +
-                '<span class="step-num">' + (i+1) + '.</span>' +
+            html += '<div class="step-row"><span class="step-num">' + (i+1) + '.</span>' +
                 '<textarea placeholder="Describe this step..." oninput="app.currentRecipe.steps[' + i + ']=this.value" rows="2">' +
                 (this.currentRecipe.steps[i] || '') + '</textarea>' +
-                (i > 0 ? '<button onclick="app.removeRecipeStep(' + i + ')">✕</button>' : '') +
-                '</div>';
+                (i > 0 ? '<button onclick="app.removeRecipeStep(' + i + ')">✕</button>' : '') + '</div>';
         }
         document.getElementById('recStepsList').innerHTML = html;
     },
 
-    removeRecipeStep(i) {
-        this.currentRecipe.steps.splice(i, 1);
-        this.renderRecipeSteps();
-    },
+    removeRecipeStep(i) { this.currentRecipe.steps.splice(i, 1); this.renderRecipeSteps(); },
 
     saveRecipe() {
         var name = document.getElementById('recName').value.trim();
         if (!name) { alert('Please enter a recipe name.'); return; }
         if (this.currentRecipe.ingredients.length === 0) { alert('Add at least one ingredient.'); return; }
-
         var self = this;
         var total = this.currentRecipe.ingredients.reduce(function(s, ing) {
             var base = self.ingredients[ing.name.toLowerCase()];
             return s + (base ? base.kcal * ing.amount / 100 : 0);
         }, 0);
-
         var recipe = {
-            id: this.editingRecipeId || Date.now(),
-            name: name,
+            id: this.editingRecipeId || Date.now(), name: name,
             ingredients: this.currentRecipe.ingredients.slice(),
             steps: this.currentRecipe.steps.filter(function(s) { return s.trim(); }),
-            totalCalories: Math.round(total),
-            categories: [],
-            tags: [],
+            totalCalories: Math.round(total), categories: [], tags: [],
             createdAt: new Date().toISOString()
         };
-
         if (this.editingRecipeId) {
             for (var i = 0; i < this.recipes.length; i++) {
                 if (this.recipes[i].id === this.editingRecipeId) { this.recipes[i] = recipe; break; }
@@ -714,7 +629,6 @@ const app = {
         } else {
             this.recipes.push(recipe);
         }
-
         this.closeRecipeModal();
         this.renderRecipes();
         this.saveRecipesBin();
