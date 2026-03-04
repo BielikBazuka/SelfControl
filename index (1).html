@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalorix — Calorie Journal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+    <nav class="sidebar">
+        <div class="sidebar-logo">
+            <span class="logo-mark">K</span>
+            <span class="logo-text">Kalorix</span>
+        </div>
+        <ul class="nav-links">
+            <li class="nav-item active" data-page="dashboard" onclick="app.switchPage('dashboard')">
+                <span class="nav-icon">◈</span>
+                <span>Dashboard</span>
+            </li>
+            <li class="nav-item" data-page="recipes" onclick="app.switchPage('recipes')">
+                <span class="nav-icon">◇</span>
+                <span>Recipes &amp; Products</span>
+            </li>
+        </ul>
+        <div class="sidebar-bottom">
+            <div class="goal-display">
+                <span class="goal-label">Daily goal</span>
+                <span class="goal-value" id="sidebarGoal">— kcal</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main">
+
+        <div id="page-dashboard" class="page active">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="page-subtitle" id="todayDate"></p>
+                </div>
+                <button class="btn-primary" onclick="app.openLogModal()"><span>+</span> Add meal</button>
+            </div>
+
+            <div class="summary-strip">
+                <div class="summary-card"><span class="summary-num" id="todayKcal">0</span><span class="summary-label">kcal today</span></div>
+                <div class="summary-divider"></div>
+                <div class="summary-card"><span class="summary-num" id="goalKcal">—</span><span class="summary-label">goal</span></div>
+                <div class="summary-divider"></div>
+                <div class="summary-card" id="card-remaining"><span class="summary-num" id="remainingKcal">—</span><span class="summary-label">remaining</span></div>
+                <div class="summary-divider"></div>
+                <div class="summary-card"><span class="summary-num" id="mealCount">0</span><span class="summary-label">meals</span></div>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-track">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <span class="progress-pct" id="progressPct">—</span>
+            </div>
+
+            <div class="chart-section">
+                <div class="chart-header">
+                    <h2 class="section-title">Calorie history</h2>
+                    <div class="timeframe-pills">
+                        <button class="pill active" onclick="app.setTimeframe(7, this)">7 days</button>
+                        <button class="pill" onclick="app.setTimeframe(30, this)">30 days</button>
+                        <button class="pill" onclick="app.setTimeframe(90, this)">3 months</button>
+                    </div>
+                </div>
+                <div class="chart-wrap"><canvas id="calorieChart"></canvas></div>
+            </div>
+
+            <div class="log-section">
+                <div class="log-header">
+                    <h2 class="section-title">Meals</h2>
+                    <div class="date-nav">
+                        <button class="date-btn" onclick="app.changeDay(-1)">&#8249;</button>
+                        <span id="logDateLabel">Today</span>
+                        <button class="date-btn" onclick="app.changeDay(1)">&#8250;</button>
+                    </div>
+                </div>
+                <div class="day-note-wrap">
+                    <input type="text" id="dayNote" class="day-note-input" placeholder="Note / mood for today... (auto-saves)">
+                </div>
+                <div id="todayMeals" class="meals-list"></div>
+            </div>
+        </div>
+
+        <div id="page-recipes" class="page">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Recipes &amp; Products</h1>
+                    <p class="page-subtitle">Database</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-secondary" onclick="app.openIngredientModal()">+ Product</button>
+                    <button class="btn-primary" onclick="app.openRecipeModal()">+ Recipe</button>
+                </div>
+            </div>
+            <div class="two-col">
+                <div class="data-panel">
+                    <div class="panel-header">
+                        <h3>Products <span class="count-badge" id="ingCount">0</span></h3>
+                        <input type="text" class="search-small" id="ingSearch" placeholder="Search..." oninput="app.filterIngredients()">
+                    </div>
+                    <div id="ingredientsList" class="data-list"></div>
+                </div>
+                <div class="data-panel">
+                    <div class="panel-header">
+                        <h3>Recipes <span class="count-badge" id="recCount">0</span></h3>
+                        <input type="text" class="search-small" id="recSearch" placeholder="Search..." oninput="app.filterRecipes()">
+                    </div>
+                    <div id="recipesList" class="data-list"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- Log Meal Modal -->
+<div id="logModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header"><h2>Add meal</h2><button class="modal-close" onclick="app.closeLogModal()">&#10005;</button></div>
+        <div class="modal-body">
+            <div class="form-row"><label>Type</label>
+                <div class="type-toggle">
+                    <button class="type-btn active" data-type="ingredient" onclick="app.setLogType('ingredient', this)">Product</button>
+                    <button class="type-btn" data-type="recipe" onclick="app.setLogType('recipe', this)">Recipe</button>
+                    <button class="type-btn" data-type="quick" onclick="app.setLogType('quick', this)">Quick kcal</button>
+                </div>
+            </div>
+            <div class="form-row" id="logSelectRow"><label>Select</label><select id="logItemSelect" class="form-select"></select></div>
+            <div class="form-row" id="logNameRow" style="display:none"><label>Name (optional)</label><input type="text" id="logQuickName" class="form-input" placeholder="e.g. lunch, snack, coffee..."></div>
+            <div class="form-row"><label id="logAmountLabel">Amount (g / ml)</label><input type="number" id="logAmount" class="form-input" placeholder="e.g. 150"></div>
+            <div class="form-row"><span class="calc-preview" id="logCalcPreview"></span></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-ghost" onclick="app.closeLogModal()">Cancel</button>
+            <button class="btn-primary" onclick="app.saveLogEntry()">Add</button>
+        </div>
+    </div>
+</div>
+
+<!-- Goal Modal -->
+<div id="goalModal" class="modal-overlay">
+    <div class="modal modal-sm">
+        <div class="modal-header"><h2>Calorie goal</h2><button class="modal-close" onclick="app.closeGoalModal()">&#10005;</button></div>
+        <div class="modal-body">
+            <div class="form-row"><label>Daily goal (kcal)</label><input type="number" id="goalInput" class="form-input" placeholder="e.g. 2000"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-ghost" onclick="app.closeGoalModal()">Cancel</button>
+            <button class="btn-primary" onclick="app.saveGoal()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Product Modal -->
+<div id="ingredientModal" class="modal-overlay">
+    <div class="modal modal-sm">
+        <div class="modal-header"><h2>New product</h2><button class="modal-close" onclick="app.closeIngredientModal()">&#10005;</button></div>
+        <div class="modal-body">
+            <div class="form-row"><label>Name</label><input type="text" id="newIngName" class="form-input" placeholder="e.g. Oatmeal"></div>
+            <div class="form-row"><label>Kcal per 100g / ml</label><input type="number" id="newIngKcal" class="form-input" placeholder="e.g. 389"></div>
+            <div class="form-row"><label>Unit</label>
+                <select id="newIngUnit" class="form-select">
+                    <option value="100g">100g (solid)</option>
+                    <option value="100ml">100ml (liquid)</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-ghost" onclick="app.closeIngredientModal()">Cancel</button>
+            <button class="btn-primary" onclick="app.saveIngredient()">Add</button>
+        </div>
+    </div>
+</div>
+
+<!-- Recipe Modal -->
+<div id="recipeModal" class="modal-overlay">
+    <div class="modal modal-lg">
+        <div class="modal-header"><h2 id="recipeModalTitle">New recipe</h2><button class="modal-close" onclick="app.closeRecipeModal()">&#10005;</button></div>
+        <div class="modal-body">
+            <div class="form-row"><label>Recipe name</label><input type="text" id="recName" class="form-input" placeholder="e.g. Oatmeal with fruit"></div>
+            <div class="form-row"><label>Ingredients</label>
+                <div class="ing-add-row">
+                    <select id="recIngSelect" class="form-select flex1"></select>
+                    <input type="number" id="recIngAmount" class="form-input w80" placeholder="g/ml">
+                    <button class="btn-icon" onclick="app.addRecipeIngredient()">+</button>
+                </div>
+                <div id="recIngList" class="rec-ing-list"></div>
+            </div>
+            <div class="form-row"><label>Preparation steps</label>
+                <div id="recStepsList" class="steps-list"></div>
+                <button class="btn-ghost-sm" onclick="app.addRecipeStep()">+ Add step</button>
+            </div>
+            <div class="rec-total" id="recTotal"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-ghost" onclick="app.closeRecipeModal()">Cancel</button>
+            <button class="btn-primary" onclick="app.saveRecipe()">Save recipe</button>
+        </div>
+    </div>
+</div>
+
+<script src="ingredients.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
