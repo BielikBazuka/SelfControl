@@ -6,9 +6,9 @@
 const app = {
 
     // ── Config ─────────────────────────────────────
-    REC_BIN:    'YOUR_RECIPES_BIN_ID',
-    LOG_BIN:    'YOUR_LOG_BIN_ID',
-    API_KEY:    'YOUR_API_KEY',
+    REC_BIN:    '69a82fc4d0ea881f40ee2767',
+    LOG_BIN:    'Y69a82fe143b1c97be9b2bc03',
+    API_KEY:    '$2a$10$mSZ34uDjWfYsW2LhVV44i.r8ZC4g0IouOa4/JyeZfZcQkllXhM/Vq',
 
     get REC_URL() { return 'https://api.jsonbin.io/v3/b/' + this.REC_BIN; },
     get LOG_URL() { return 'https://api.jsonbin.io/v3/b/' + this.LOG_BIN; },
